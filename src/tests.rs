@@ -452,6 +452,12 @@ proxy-groups:
       - Proxy
       - DIRECT
 
+rule-providers:
+  file-provider:
+    type: file
+    path: ./rule-set.yaml
+    interval: 300
+    behavior: domain
 proxy-providers:
   provider1:
     type: http
@@ -511,5 +517,14 @@ rules:
             .unwrap(),
         Some("websocket")
     );
+    let rps = des.get_rule_providers();
+    let fp = rps.get("file-provider").unwrap();
+    assert!(matches!(
+        fp,
+        RuleProvider::File(FileRuleProvider {
+            path: _,
+            interval: Some(300),
+            behavior: RuleSetBehavior::Domain,
+        })
+    ))
 }
-

@@ -20,6 +20,22 @@ pub enum Error {
     InvalidBindAddress(String),
 }
 
+pub fn map_serde_error(name: String) -> impl FnOnce(serde_yaml::Error) -> crate::Error {
+    move |x| {
+        if let Some(loc) = x.location() {
+            Error::InvalidConfig(format!(
+                "invalid config for {} at line {}, column {} while parsing {}",
+                name,
+                loc.line(),
+                loc.column(),
+                name
+            ))
+        } else {
+            Error::InvalidConfig(format!("error while parsine {}: {}", name, x))
+        }
+    }
+}
+
 /// Example
 /// ```yaml
 /// ---
@@ -286,6 +302,26 @@ pub struct Config {
     pub tun: Option<TunConfig>,
 
     pub listeners: Option<Vec<HashMap<String, Value>>>,
+}
+
+impl Config {
+    pub fn get_rule_providers(&self) -> HashMap<String, RuleProvider> {
+        self.rule_providers
+            .clone()
+            .map(|m| {
+                m.into_iter()
+                    .try_fold(HashMap::new(), |mut rv, (name, mut body)| {
+                        body.insert("name".to_owned(), serde_yaml::Value::String(name.clone()));
+                        let provider = RuleProvider::try_from(body).map_err(|x| {
+                            Error::InvalidConfig(format!("invalid rule provider {}: {}", name, x))
+                        })?;
+                        rv.insert(name, provider);
+                        Ok::<HashMap<std::string::String, RuleProvider>, Error>(rv)
+                    })
+                    .expect("proxy provider parse error")
+            })
+            .unwrap_or_default()
+    }
 }
 
 impl TryFrom<PathBuf> for Config {
@@ -559,8 +595,6 @@ impl Display for LogLevel {
 
 use std::net::{IpAddr, Ipv4Addr};
 
-// use ipnet::IpNet;
-
 #[derive(Serialize, Clone, Debug, Copy, PartialEq)]
 #[serde(transparent)]
 pub struct BindAddress(pub IpAddr);
@@ -616,5 +650,62 @@ impl FromStr for BindAddress {
                 }
             }
         }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type")]
+#[serde(rename_all = "kebab-case")]
+pub enum RuleProvider {
+    Http(HttpRuleProvider),
+    File(FileRuleProvider),
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct HttpRuleProvider {
+    pub url: String,
+    pub interval: u64,
+    pub behavior: RuleSetBehavior,
+    pub path: String,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct FileRuleProvider {
+    pub path: String,
+    pub interval: Option<u64>,
+    pub behavior: RuleSetBehavior,
+}
+
+#[derive(Deserialize, Serialize, Debug, Clone, Copy)]
+#[serde(rename_all = "lowercase")]
+pub enum RuleSetBehavior {
+    Domain,
+    Ipcidr,
+    Classical,
+}
+
+impl Display for RuleSetBehavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            RuleSetBehavior::Domain => write!(f, "Domain"),
+            RuleSetBehavior::Ipcidr => write!(f, "IPCIDR"),
+            RuleSetBehavior::Classical => write!(f, "Classical"),
+        }
+    }
+}
+
+impl TryFrom<HashMap<String, Value>> for RuleProvider {
+    type Error = crate::Error;
+
+    fn try_from(mapping: HashMap<String, Value>) -> Result<Self, Self::Error> {
+        let name = mapping
+            .get("name")
+            .and_then(|x| x.as_str())
+            .ok_or(Error::InvalidConfig(
+                "rule provider name is required".to_owned(),
+            ))?
+            .to_owned();
+        RuleProvider::deserialize(serde::de::value::MapDeserializer::new(mapping.into_iter()))
+            .map_err(map_serde_error(name))
     }
 }
