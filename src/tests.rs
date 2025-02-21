@@ -541,6 +541,7 @@ rules:
             interval: Some(300),
             name: _,
             health_check: _,
+            r#override: _,
         })
     ))
 }

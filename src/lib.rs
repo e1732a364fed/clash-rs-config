@@ -31,7 +31,7 @@ pub fn map_serde_error(name: String) -> impl FnOnce(serde_yaml::Error) -> crate:
                 name
             ))
         } else {
-            Error::InvalidConfig(format!("error while parsine {}: {}", name, x))
+            Error::InvalidConfig(format!("error while parsing {}: {}", name, x))
         }
     }
 }
@@ -684,6 +684,10 @@ pub struct HttpRuleProvider {
     pub interval: u64,
     pub behavior: RuleSetBehavior,
     pub path: String,
+    /// the proxy used for requesting the url
+    pub proxy: Option<String>,
+    /// the http used for requesting the url
+    pub header: Option<HashMap<String, Vec<String>>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -714,15 +718,15 @@ impl Display for RuleSetBehavior {
 impl TryFrom<HashMap<String, Value>> for RuleProvider {
     type Error = crate::Error;
 
-    fn try_from(mapping: HashMap<String, Value>) -> Result<Self, Self::Error> {
-        let name = mapping
+    fn try_from(map: HashMap<String, Value>) -> Result<Self, Self::Error> {
+        let name = map
             .get("name")
             .and_then(|x| x.as_str())
             .ok_or(Error::InvalidConfig(
                 "rule provider name is required".to_owned(),
             ))?
             .to_owned();
-        RuleProvider::deserialize(serde::de::value::MapDeserializer::new(mapping.into_iter()))
+        RuleProvider::deserialize(serde::de::value::MapDeserializer::new(map.into_iter()))
             .map_err(map_serde_error(name))
     }
 }
@@ -740,10 +744,17 @@ pub enum ProxyProvider {
 pub struct HttpProxyProvider {
     #[serde(skip)]
     pub name: String,
-    pub url: String,
-    pub interval: u64,
     pub path: String,
+    pub interval: u64,
     pub health_check: Option<HealthCheck>,
+    /// override proxy configs
+    pub r#override: Option<HashMap<String, Value>>,
+
+    pub url: String,
+    /// the proxy used for requesting the url
+    pub proxy: Option<String>,
+    /// the http used for requesting the url
+    pub header: Option<HashMap<String, Vec<String>>>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -754,6 +765,8 @@ pub struct FileProxyProvider {
     pub path: String,
     pub interval: Option<u64>,
     pub health_check: Option<HealthCheck>,
+    /// override proxy configs
+    pub r#override: Option<HashMap<String, Value>>,
 }
 
 #[derive(serde::Serialize, serde::Deserialize, Debug)]
@@ -767,15 +780,15 @@ pub struct HealthCheck {
 impl TryFrom<HashMap<String, Value>> for ProxyProvider {
     type Error = crate::Error;
 
-    fn try_from(mapping: HashMap<String, Value>) -> Result<Self, Self::Error> {
-        let name = mapping
+    fn try_from(map: HashMap<String, Value>) -> Result<Self, Self::Error> {
+        let name = map
             .get("name")
             .and_then(|x| x.as_str())
             .ok_or(Error::InvalidConfig(
                 "missing field `name` in outbound proxy provider".to_owned(),
             ))?
             .to_owned();
-        ProxyProvider::deserialize(serde::de::value::MapDeserializer::new(mapping.into_iter()))
+        ProxyProvider::deserialize(serde::de::value::MapDeserializer::new(map.into_iter()))
             .map_err(map_serde_error(name))
     }
 }
