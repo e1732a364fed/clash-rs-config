@@ -495,6 +495,8 @@ rules:
   - SRC-PORT,7777,DIRECT
   - RULE-SET,apple,REJECT # Premium only
   - MATCH,auto
+
+djhssjj: ksksk
   "###;
 
     let c: Config = serde_yaml::from_str(example_cfg).expect("should parse yaml");
@@ -546,4 +548,5 @@ rules:
     ));
 
     assert_eq!(c.proxy_groups.unwrap()[0].name(), "relay");
+    assert_eq!(c.extra.get("djhssjj").unwrap().as_str().unwrap(), "ksksk")
 }

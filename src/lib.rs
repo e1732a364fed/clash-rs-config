@@ -364,6 +364,10 @@ pub struct Config {
     pub tun: Option<TunConfig>,
 
     pub listeners: Option<Vec<HashMap<String, Value>>>,
+
+    /// stores any other undefined fields
+    #[serde(flatten)]
+    pub extra: HashMap<String, Value>,
 }
 
 impl TryFrom<PathBuf> for Config {
