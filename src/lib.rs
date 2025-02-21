@@ -227,12 +227,9 @@ pub struct Config {
     /// Profile settings
     pub profile: Profile,
     /// Proxy settings
-    // #[serde(rename = "proxies")]
     pub proxies: Option<Vec<HashMap<String, Value>>>,
-    // #[serde(rename = "proxy-groups")]
     /// Proxy group settings
     pub proxy_groups: Option<Vec<HashMap<String, Value>>>,
-    // #[serde(rename = "rules")]
     /// Rule settings
     pub rules: Option<Vec<String>>,
     /// Hosts
@@ -268,15 +265,12 @@ pub struct Config {
     pub external_ui: Option<String>,
     /// external controller secret
     pub secret: Option<String>,
-    // #[serde(rename = "interface-name")]
     /// outbound interface name
     pub interface_name: Option<String>,
     /// fwmark on Linux only
     pub routing_mask: Option<u32>,
-    // #[serde(rename = "proxy-providers")]
     /// proxy provider settings
     pub proxy_providers: Option<HashMap<String, HashMap<String, Value>>>,
-    // #[serde(rename = "rule-providers")]
     /// rule provider settings
     pub rule_providers: Option<HashMap<String, HashMap<String, Value>>>,
     /// experimental settings, if any
@@ -291,7 +285,6 @@ pub struct Config {
     /// ```
     pub tun: Option<TunConfig>,
 
-    // #[serde(rename = "listeners")]
     pub listeners: Option<Vec<HashMap<String, Value>>>,
 }
 
@@ -404,15 +397,12 @@ pub enum DNSMode {
 #[serde(default)]
 #[educe(Default)]
 pub struct FallbackFilter {
-    // #[serde(rename = "geoip")]
     #[educe(Default = true)]
     pub geoip: bool,
 
-    // #[serde(rename = "geoip-code")]
     #[educe(Default = "CN")]
     pub geoip_code: String,
 
-    // #[serde(rename = "ipcidr")]
     pub ipcidr: Vec<String>,
     pub domain: Vec<String>,
 }
