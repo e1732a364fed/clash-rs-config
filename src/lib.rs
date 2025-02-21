@@ -5,8 +5,8 @@ use educe::Educe;
 use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr};
 
 use serde::{Deserialize, Deserializer, Serialize};
-use serde_yaml_ng as serde_yaml;
-use serde_yaml_ng::Value;
+pub use serde_yml as serde_yaml;
+use serde_yml::Value;
 
 use thiserror::Error;
 #[derive(Error, Debug)]

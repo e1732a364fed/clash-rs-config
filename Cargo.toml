@@ -13,5 +13,6 @@ repository = "https://github.com/e1732a364fed/clash_config"
 [dependencies]
 educe = "0.6.0"
 serde = { version = "1", features = ["derive"] }
-serde_yaml_ng = "0.10"
+# serde_yaml_ng = "0.10"
+serde_yml = "0.0.12"
 thiserror = "2"
