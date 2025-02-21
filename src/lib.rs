@@ -322,6 +322,23 @@ impl Config {
             })
             .unwrap_or_default()
     }
+    pub fn get_proxy_providers(&self) -> HashMap<String, ProxyProvider> {
+        self.proxy_providers
+            .clone()
+            .map(|m| {
+                m.into_iter()
+                    .try_fold(HashMap::new(), |mut rv, (name, mut body)| {
+                        body.insert("name".to_owned(), serde_yaml::Value::String(name.clone()));
+                        let provider = ProxyProvider::try_from(body).map_err(|x| {
+                            Error::InvalidConfig(format!("invalid proxy provider {}: {}", name, x))
+                        })?;
+                        rv.insert(name, provider);
+                        Ok::<HashMap<std::string::String, ProxyProvider>, Error>(rv)
+                    })
+                    .expect("proxy provider parse error")
+            })
+            .unwrap_or_default()
+    }
 }
 
 impl TryFrom<PathBuf> for Config {
@@ -706,6 +723,59 @@ impl TryFrom<HashMap<String, Value>> for RuleProvider {
             ))?
             .to_owned();
         RuleProvider::deserialize(serde::de::value::MapDeserializer::new(mapping.into_iter()))
+            .map_err(map_serde_error(name))
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(tag = "type")]
+#[serde(rename_all = "kebab-case")]
+pub enum ProxyProvider {
+    Http(HttpProxyProvider),
+    File(FileProxyProvider),
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct HttpProxyProvider {
+    #[serde(skip)]
+    pub name: String,
+    pub url: String,
+    pub interval: u64,
+    pub path: String,
+    pub health_check: Option<HealthCheck>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+#[serde(rename_all = "kebab-case")]
+pub struct FileProxyProvider {
+    #[serde(skip)]
+    pub name: String,
+    pub path: String,
+    pub interval: Option<u64>,
+    pub health_check: Option<HealthCheck>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug)]
+pub struct HealthCheck {
+    pub enable: bool,
+    pub url: String,
+    pub interval: u64,
+    pub lazy: Option<bool>,
+}
+
+impl TryFrom<HashMap<String, Value>> for ProxyProvider {
+    type Error = crate::Error;
+
+    fn try_from(mapping: HashMap<String, Value>) -> Result<Self, Self::Error> {
+        let name = mapping
+            .get("name")
+            .and_then(|x| x.as_str())
+            .ok_or(Error::InvalidConfig(
+                "missing field `name` in outbound proxy provider".to_owned(),
+            ))?
+            .to_owned();
+        ProxyProvider::deserialize(serde::de::value::MapDeserializer::new(mapping.into_iter()))
             .map_err(map_serde_error(name))
     }
 }

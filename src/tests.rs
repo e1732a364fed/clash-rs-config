@@ -469,6 +469,11 @@ proxy-providers:
       interval: 600
       # lazy: true
       url: http://www.gstatic.com/generate_204
+  file-provider:
+    type: file
+    path: ./rule-set.yaml
+    interval: 300
+    behavior: domain
   test:
     type: file
     path: /test.yaml
@@ -525,6 +530,17 @@ rules:
             path: _,
             interval: Some(300),
             behavior: RuleSetBehavior::Domain,
+        })
+    ));
+    let rps = des.get_proxy_providers();
+    let fp = rps.get("file-provider").unwrap();
+    assert!(matches!(
+        fp,
+        ProxyProvider::File(FileProxyProvider {
+            path: _,
+            interval: Some(300),
+            name: _,
+            health_check: _,
         })
     ))
 }
