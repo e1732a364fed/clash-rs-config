@@ -1,5 +1,5 @@
 [package]
-name = "clash_config"
+name = "clash-rs-config"
 version = "0.1.0"
 edition = "2021"
 categories = ["data-structures", "config"]
@@ -7,8 +7,8 @@ keywords = ["clash", "yaml"]
 license = "Apache-2.0"
 readme = "README.md"
 description = "a clash yaml config parser"
-homepage = "https://github.com/e1732a364fed/clash_config"
-repository = "https://github.com/e1732a364fed/clash_config"
+homepage = "https://github.com/e1732a364fed/clash-rs-config"
+repository = "https://github.com/e1732a364fed/clash-rs-config"
 
 [dependencies]
 educe = "0.6.0"
