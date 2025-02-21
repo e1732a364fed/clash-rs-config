@@ -522,7 +522,7 @@ rules:
             .unwrap(),
         Some("websocket")
     );
-    let rps = c.get_rule_providers();
+    let rps = c.rule_providers.unwrap();
     let fp = rps.get("file-provider").unwrap();
     assert!(matches!(
         fp,
@@ -532,7 +532,7 @@ rules:
             behavior: RuleSetBehavior::Domain,
         })
     ));
-    let rps = c.get_proxy_providers();
+    let rps = c.proxy_providers.unwrap();
     let fp = rps.get("file-provider").unwrap();
     assert!(matches!(
         fp,

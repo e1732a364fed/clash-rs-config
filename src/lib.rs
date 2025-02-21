@@ -305,9 +305,9 @@ pub struct Config {
     /// fwmark on Linux only
     pub routing_mask: Option<u32>,
     /// proxy provider settings
-    pub proxy_providers: Option<HashMap<String, HashMap<String, Value>>>,
+    pub proxy_providers: Option<HashMap<String, ProxyProvider>>,
     /// rule provider settings
-    pub rule_providers: Option<HashMap<String, HashMap<String, Value>>>,
+    pub rule_providers: Option<HashMap<String, RuleProvider>>,
     /// experimental settings, if any
     pub experimental: Option<Experimental>,
 
@@ -321,43 +321,6 @@ pub struct Config {
     pub tun: Option<TunConfig>,
 
     pub listeners: Option<Vec<HashMap<String, Value>>>,
-}
-
-impl Config {
-    pub fn get_rule_providers(&self) -> HashMap<String, RuleProvider> {
-        self.rule_providers
-            .clone()
-            .map(|m| {
-                m.into_iter()
-                    .try_fold(HashMap::new(), |mut rv, (name, mut body)| {
-                        body.insert("name".to_owned(), serde_yaml::Value::String(name.clone()));
-                        let provider = RuleProvider::try_from(body).map_err(|x| {
-                            Error::InvalidConfig(format!("invalid rule provider {}: {}", name, x))
-                        })?;
-                        rv.insert(name, provider);
-                        Ok::<HashMap<std::string::String, RuleProvider>, Error>(rv)
-                    })
-                    .expect("proxy provider parse error")
-            })
-            .unwrap_or_default()
-    }
-    pub fn get_proxy_providers(&self) -> HashMap<String, ProxyProvider> {
-        self.proxy_providers
-            .clone()
-            .map(|m| {
-                m.into_iter()
-                    .try_fold(HashMap::new(), |mut rv, (name, mut body)| {
-                        body.insert("name".to_owned(), serde_yaml::Value::String(name.clone()));
-                        let provider = ProxyProvider::try_from(body).map_err(|x| {
-                            Error::InvalidConfig(format!("invalid proxy provider {}: {}", name, x))
-                        })?;
-                        rv.insert(name, provider);
-                        Ok::<HashMap<std::string::String, ProxyProvider>, Error>(rv)
-                    })
-                    .expect("proxy provider parse error")
-            })
-            .unwrap_or_default()
-    }
 }
 
 impl TryFrom<PathBuf> for Config {
