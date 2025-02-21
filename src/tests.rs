@@ -6,7 +6,7 @@ fn parse_simple() {
         port: 9090
         "#;
     let c = cfg.parse::<Config>().expect("should parse");
-    assert_eq!(c.port, Some(Port(9090)));
+    assert_eq!(c.port, Some(9090));
 }
 
 #[test]
@@ -15,7 +15,7 @@ fn test_str_port() {
         port: "9090"
         "#;
     let c = cfg.parse::<Config>().expect("should parse");
-    assert_eq!(c.port, Some(Port(9090)));
+    assert_eq!(c.port, Some(9090));
 }
 
 #[test]
@@ -498,7 +498,7 @@ rules:
   "###;
 
     let c: Config = serde_yaml::from_str(example_cfg).expect("should parse yaml");
-    assert_eq!(c.port.expect("invalid port"), Port(7890));
+    assert_eq!(c.port.expect("invalid port"), 7890);
     assert_eq!(c.dns.fallback_filter.geoip_code, String::from("CN"));
     assert_eq!(c.proxies.as_ref().map(|v| v.len()).unwrap_or(0), 14);
     assert_eq!(

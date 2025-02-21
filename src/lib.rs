@@ -4,7 +4,7 @@ mod tests;
 use educe::Educe;
 use std::{collections::HashMap, fmt::Display, path::PathBuf, str::FromStr};
 
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 pub use serde_yml as serde_yaml;
 use serde_yml::Value;
 
@@ -36,7 +36,38 @@ pub fn map_serde_error(name: String) -> impl FnOnce(serde_yaml::Error) -> crate:
     }
 }
 
-pub fn deserialize_u64<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+/// sometimes we need to parse string as number.
+/// put #[serde(deserialize_with = "deserialize_opt_num")] before Option<u16>
+///
+/// must put after #[serde(default)], or we will get runtime error
+/// https://github.com/serde-rs/json/issues/893
+pub fn deserialize_opt_num<'de, T, D>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: FromStr + serde::Deserialize<'de>,
+    <T as FromStr>::Err: Display,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrNum<T> {
+        String(String),
+        Num(T),
+    }
+    let r = StringOrNum::<T>::deserialize(deserializer);
+
+    match r {
+        Ok(r) => match r {
+            StringOrNum::String(s) => s.parse().map(|x| Some(x)).map_err(serde::de::Error::custom),
+            StringOrNum::Num(n) => Ok(Some(n)),
+        },
+        Err(_) => Ok(None),
+    }
+}
+
+/// sometimes we need to parse string as number
+///
+/// put #[serde(deserialize_with = "deserialize_num")] before u16
+pub fn deserialize_num<'de, T, D>(deserializer: D) -> Result<T, D::Error>
 where
     D: serde::Deserializer<'de>,
     T: FromStr + serde::Deserialize<'de>,
@@ -223,20 +254,30 @@ where
 #[educe(Default)]
 pub struct Config {
     /// The HTTP proxy port
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
     #[serde(alias = "http_port")]
-    pub port: Option<Port>,
+    pub port: Option<u16>,
     /// The SOCKS5 proxy port
-    pub socks_port: Option<Port>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
+    pub socks_port: Option<u16>,
     /// The redir port
     #[doc(hidden)]
-    pub redir_port: Option<Port>,
-    pub tproxy_port: Option<Port>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
+    pub redir_port: Option<u16>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
+    pub tproxy_port: Option<u16>,
     /// The HTTP/SOCKS5 mixed proxy port
     /// # Example
     /// ```yaml
     /// mixed-port: 7892
     /// ```
-    pub mixed_port: Option<Port>,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
+    pub mixed_port: Option<u16>,
 
     /// HTTP and SOCKS5 proxy authentication
     pub authentication: Vec<String>,
@@ -303,6 +344,8 @@ pub struct Config {
     /// outbound interface name
     pub interface_name: Option<String>,
     /// fwmark on Linux only
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
     pub routing_mask: Option<u32>,
     /// proxy provider settings
     pub proxy_providers: Option<HashMap<String, ProxyProvider>>,
@@ -468,42 +511,6 @@ impl Default for Profile {
     }
 }
 
-#[derive(PartialEq, Debug, Clone, Serialize, Copy)]
-pub struct Port(pub u16);
-
-impl From<Port> for u16 {
-    fn from(value: Port) -> Self {
-        value.0
-    }
-}
-
-impl<'de> Deserialize<'de> for Port {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum StrOrNum {
-            Str(String),
-            Num(u64),
-            Other,
-        }
-
-        let value = StrOrNum::deserialize(deserializer)?;
-
-        match value {
-            StrOrNum::Num(num) => u16::try_from(num)
-                .map(Port)
-                .map_err(|_| serde::de::Error::custom("Port number out of range")),
-
-            StrOrNum::Str(s) => s.parse::<u16>().map(Port).map_err(serde::de::Error::custom),
-
-            StrOrNum::Other => Err(serde::de::Error::custom("Invalid type for port")),
-        }
-    }
-}
-
 fn default_tun_address() -> String {
     "198.18.0.1/32".to_string()
 }
@@ -533,10 +540,16 @@ pub struct TunConfig {
     pub routes: Option<Vec<String>>,
     #[serde(default)]
     pub route_all: bool,
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
     pub mtu: Option<u16>,
     /// fwmark on Linux only
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
     pub so_mark: Option<u32>,
     /// policy routing table on Linux only
+    #[serde(default)]
+    #[serde(deserialize_with = "deserialize_opt_num")]
     pub route_table: Option<u32>,
     /// Will hijack UDP:53 DNS queries to the Clash DNS server if set to true
     /// setting to a list has the same effect as setting to true
@@ -856,7 +869,7 @@ pub struct OutboundGroupUrlTest {
     pub use_provider: Option<Vec<String>>,
 
     pub url: String,
-    #[serde(deserialize_with = "deserialize_u64")]
+    #[serde(deserialize_with = "deserialize_num")]
     pub interval: u64,
     pub lazy: Option<bool>,
     pub tolerance: Option<u16>,
@@ -871,7 +884,7 @@ pub struct OutboundGroupFallback {
     pub use_provider: Option<Vec<String>>,
 
     pub url: String,
-    #[serde(deserialize_with = "deserialize_u64")]
+    #[serde(deserialize_with = "deserialize_num")]
     pub interval: u64,
     pub lazy: Option<bool>,
     pub icon: Option<String>,
@@ -886,7 +899,7 @@ pub struct OutboundGroupLoadBalance {
     pub use_provider: Option<Vec<String>>,
 
     pub url: String,
-    #[serde(deserialize_with = "deserialize_u64")]
+    #[serde(deserialize_with = "deserialize_num")]
     pub interval: u64,
     pub lazy: Option<bool>,
     pub strategy: Option<LoadBalanceStrategy>,
