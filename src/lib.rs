@@ -36,6 +36,25 @@ pub fn map_serde_error(name: String) -> impl FnOnce(serde_yaml::Error) -> crate:
     }
 }
 
+pub fn deserialize_u64<'de, T, D>(deserializer: D) -> Result<T, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: FromStr + serde::Deserialize<'de>,
+    <T as FromStr>::Err: Display,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum StringOrNum<T> {
+        String(String),
+        Num(T),
+    }
+
+    match StringOrNum::<T>::deserialize(deserializer)? {
+        StringOrNum::String(s) => s.parse().map_err(serde::de::Error::custom),
+        StringOrNum::Num(n) => Ok(n),
+    }
+}
+
 /// Example
 /// ```yaml
 /// ---
@@ -245,7 +264,7 @@ pub struct Config {
     /// Proxy settings
     pub proxies: Option<Vec<HashMap<String, Value>>>,
     /// Proxy group settings
-    pub proxy_groups: Option<Vec<HashMap<String, Value>>>,
+    pub proxy_groups: Option<Vec<OutboundGroupProtocol>>,
     /// Rule settings
     pub rules: Option<Vec<String>>,
     /// Hosts
@@ -791,4 +810,144 @@ impl TryFrom<HashMap<String, Value>> for ProxyProvider {
         ProxyProvider::deserialize(serde::de::value::MapDeserializer::new(map.into_iter()))
             .map_err(map_serde_error(name))
     }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone)]
+#[serde(tag = "type")]
+#[serde(rename_all = "kebab-case")]
+pub enum OutboundGroupProtocol {
+    Relay(OutboundGroupRelay),
+    UrlTest(OutboundGroupUrlTest),
+    Fallback(OutboundGroupFallback),
+    LoadBalance(OutboundGroupLoadBalance),
+    Select(OutboundGroupSelect),
+}
+
+impl OutboundGroupProtocol {
+    pub fn name(&self) -> &str {
+        match &self {
+            OutboundGroupProtocol::Relay(g) => &g.name,
+            OutboundGroupProtocol::UrlTest(g) => &g.name,
+            OutboundGroupProtocol::Fallback(g) => &g.name,
+            OutboundGroupProtocol::LoadBalance(g) => &g.name,
+            OutboundGroupProtocol::Select(g) => &g.name,
+        }
+    }
+
+    pub fn proxies(&self) -> Option<&Vec<String>> {
+        match &self {
+            OutboundGroupProtocol::Relay(g) => g.proxies.as_ref(),
+            OutboundGroupProtocol::UrlTest(g) => g.proxies.as_ref(),
+            OutboundGroupProtocol::Fallback(g) => g.proxies.as_ref(),
+            OutboundGroupProtocol::LoadBalance(g) => g.proxies.as_ref(),
+            OutboundGroupProtocol::Select(g) => g.proxies.as_ref(),
+        }
+    }
+}
+
+impl TryFrom<HashMap<String, Value>> for OutboundGroupProtocol {
+    type Error = Error;
+
+    fn try_from(mapping: HashMap<String, Value>) -> Result<Self, Self::Error> {
+        let name = mapping
+            .get("name")
+            .and_then(|x| x.as_str())
+            .ok_or(Error::InvalidConfig(
+                "missing field `name` in outbound proxy grouop".to_owned(),
+            ))?
+            .to_owned();
+        OutboundGroupProtocol::deserialize(serde::de::value::MapDeserializer::new(
+            mapping.into_iter(),
+        ))
+        .map_err(map_serde_error(name))
+    }
+}
+
+impl Display for OutboundGroupProtocol {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            OutboundGroupProtocol::Relay(g) => write!(f, "{}", g.name),
+            OutboundGroupProtocol::UrlTest(g) => write!(f, "{}", g.name),
+            OutboundGroupProtocol::Fallback(g) => write!(f, "{}", g.name),
+            OutboundGroupProtocol::LoadBalance(g) => write!(f, "{}", g.name),
+            OutboundGroupProtocol::Select(g) => write!(f, "{}", g.name),
+        }
+    }
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default, Clone)]
+pub struct OutboundGroupRelay {
+    pub name: String,
+    pub proxies: Option<Vec<String>>,
+    #[serde(rename = "use")]
+    pub use_provider: Option<Vec<String>>,
+    pub icon: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default, Clone)]
+pub struct OutboundGroupUrlTest {
+    pub name: String,
+
+    pub proxies: Option<Vec<String>>,
+    #[serde(rename = "use")]
+    pub use_provider: Option<Vec<String>>,
+
+    pub url: String,
+    #[serde(deserialize_with = "deserialize_u64")]
+    pub interval: u64,
+    pub lazy: Option<bool>,
+    pub tolerance: Option<u16>,
+    pub icon: Option<String>,
+}
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default, Clone)]
+pub struct OutboundGroupFallback {
+    pub name: String,
+
+    pub proxies: Option<Vec<String>>,
+    #[serde(rename = "use")]
+    pub use_provider: Option<Vec<String>>,
+
+    pub url: String,
+    #[serde(deserialize_with = "deserialize_u64")]
+    pub interval: u64,
+    pub lazy: Option<bool>,
+    pub icon: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default, Clone)]
+pub struct OutboundGroupLoadBalance {
+    pub name: String,
+
+    pub proxies: Option<Vec<String>>,
+    #[serde(rename = "use")]
+    pub use_provider: Option<Vec<String>>,
+
+    pub url: String,
+    #[serde(deserialize_with = "deserialize_u64")]
+    pub interval: u64,
+    pub lazy: Option<bool>,
+    pub strategy: Option<LoadBalanceStrategy>,
+    pub icon: Option<String>,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, Copy, Default)]
+pub enum LoadBalanceStrategy {
+    #[default]
+    #[serde(rename = "consistent-hashing")]
+    ConsistentHashing,
+    #[serde(rename = "round-robin")]
+    RoundRobin,
+    #[serde(rename = "sticky-session")]
+    StickySession,
+}
+
+#[derive(serde::Serialize, serde::Deserialize, Debug, Default, Clone)]
+pub struct OutboundGroupSelect {
+    pub name: String,
+
+    pub proxies: Option<Vec<String>>,
+    #[serde(rename = "use")]
+    pub use_provider: Option<Vec<String>>,
+    pub udp: Option<bool>,
+    pub icon: Option<String>,
 }

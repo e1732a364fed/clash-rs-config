@@ -497,19 +497,19 @@ rules:
   - MATCH,auto
   "###;
 
-    let des: Config = serde_yaml::from_str(example_cfg).expect("should parse yaml");
-    assert_eq!(des.port.expect("invalid port"), Port(7890));
-    assert_eq!(des.dns.fallback_filter.geoip_code, String::from("CN"));
-    assert_eq!(des.proxies.as_ref().map(|v| v.len()).unwrap_or(0), 14);
+    let c: Config = serde_yaml::from_str(example_cfg).expect("should parse yaml");
+    assert_eq!(c.port.expect("invalid port"), Port(7890));
+    assert_eq!(c.dns.fallback_filter.geoip_code, String::from("CN"));
+    assert_eq!(c.proxies.as_ref().map(|v| v.len()).unwrap_or(0), 14);
     assert_eq!(
-        des.proxies
+        c.proxies
             .as_ref()
             .map(|v| v[2].get("name").unwrap().as_str())
             .unwrap(),
         Some("ss3")
     );
     assert_eq!(
-        des.proxies
+        c.proxies
             .as_ref()
             .map(|v| v[2]
                 .get("plugin-opts")
@@ -522,7 +522,7 @@ rules:
             .unwrap(),
         Some("websocket")
     );
-    let rps = des.get_rule_providers();
+    let rps = c.get_rule_providers();
     let fp = rps.get("file-provider").unwrap();
     assert!(matches!(
         fp,
@@ -532,7 +532,7 @@ rules:
             behavior: RuleSetBehavior::Domain,
         })
     ));
-    let rps = des.get_proxy_providers();
+    let rps = c.get_proxy_providers();
     let fp = rps.get("file-provider").unwrap();
     assert!(matches!(
         fp,
@@ -543,5 +543,7 @@ rules:
             health_check: _,
             r#override: _,
         })
-    ))
+    ));
+
+    assert_eq!(c.proxy_groups.unwrap()[0].name(), "relay");
 }
